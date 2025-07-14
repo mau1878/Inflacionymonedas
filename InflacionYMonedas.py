@@ -80,11 +80,27 @@ st.title("Calculadora de Inflación Argentina (con Cambios de Moneda)")
 
 st.markdown("""
 Esta calculadora te permite saber cuánto valdría hoy un monto del pasado, o cuánto valdría en el pasado un monto actual, teniendo en cuenta la inflación y los cambios de moneda que hubo en la Argentina.
-...
+
+**¿Por qué es importante esto?**  
+A lo largo de la historia argentina, la moneda cambió varias veces y se le quitaron ceros para simplificar los billetes. Además, la inflación hace que el valor real del dinero cambie con el tiempo.
+
+**Cambios de moneda en Argentina:**
+- **Peso Moneda Nacional** (hasta 1970)
+- **Peso Ley 18.188** (desde 1970, se quitaron 2 ceros)
+- **Peso Argentino** (desde 1983, se quitaron 4 ceros)
+- **Austral** (desde 1985, se quitaron 3 ceros)
+- **Peso** (desde 1992, se quitaron 4 ceros)
+
+Por ejemplo, $10.000.000 de Pesos Moneda Nacional (antes de 1970) equivalen a 1 Peso actual.
+
+---
 """)
 
 st.warning(
-    "⚠️ El IPC utilizado es mensual y los cálculos son aproximados... "
+    "⚠️ El IPC utilizado es mensual y los cálculos son aproximados, especialmente para períodos muy largos o con alta inflación acumulada. "
+    "Los resultados deben tomarse como una referencia orientativa, no como un valor exacto.\n\n"
+    "IMPORTANTE: En el archivo de datos, la columna 'Date' indica el primer día del mes siguiente al período de inflación mensual. "
+    "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945."
 )
 
 # Load data
@@ -158,8 +174,28 @@ if submitted:
 **Monto original:**  
 {format_arg_amount(amount)} ({currency}) al {date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount, currency)}_
-...
-            """)
+
+**Equivalente en pesos actuales (solo por cambios de moneda):**  
+{format_arg_amount(amount_in_pesos, 8)} (Peso)  
+_{amount_to_words(amount_in_pesos, 'pesos', 8)}_  
+Este valor muestra cuántos pesos actuales obtendrías si solo se aplicaran los cambios de moneda y la quita de ceros, **sin** tener en cuenta la inflación.  
+Por ejemplo, si en 1991 tenías 100.000 Australes, hoy serían 10 Pesos actuales, porque en 1992 se quitaron 4 ceros y se cambió de Austral a Peso.
+
+**Monto ajustado solo por inflación (sin cambios de moneda):**  
+{format_arg_amount(adjusted_amount_no_redenom)} ({currency})  
+_{amount_to_words(adjusted_amount_no_redenom, currency)}_  
+Este valor muestra cuánto dinero necesitarías hoy, en la **misma moneda antigua**, para tener el mismo poder de compra que tenías en esa fecha.  
+Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(100 * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))} Pesos Ley para comprar lo mismo.
+
+**Monto ajustado por inflación y cambios de moneda:**  
+{format_arg_amount(adjusted_amount)} (Peso)  
+_{amount_to_words(adjusted_amount, 'pesos')}_  
+Este es el valor más realista: muestra cuántos pesos actuales necesitarías hoy para tener el mismo poder de compra que ese monto en la fecha elegida, considerando tanto la inflación como todos los cambios de moneda.  
+Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(to_current_peso(100, parse_date('01/01/1980')) * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))} Pesos actuales para comprar lo mismo.
+
+**Período de inflación considerado:**  
+{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+""")
         else:
             currency = get_currency(date)
             inflation_factor = get_cumulative_inflation(df, date, today_date)
@@ -171,10 +207,34 @@ _{amount_to_words(amount, currency)}_
 **Monto actual:**  
 {format_arg_amount(amount)} (Peso) al {today_date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount, 'pesos')}_
-...
-            """)
+
+**Equivalente deflactado a la fecha seleccionada (solo por inflación):**  
+{format_arg_amount(amount_in_past_no_redenom, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
+_{amount_to_words(amount_in_past_no_redenom, 'pesos', 8)}_  
+Este valor muestra cuántos pesos actuales equivaldrían, en poder de compra, a la fecha elegida, **sin** tener en cuenta los cambios de moneda.  
+Por ejemplo, if hoy tenés 10.000 Pesos y querés saber cuánto valdrían en 1980, serían {format_arg_amount(10000 / get_cumulative_inflation(df, parse_date('01/01/1980'), today_date), 8)} Pesos actuales de ese año, solo ajustando por inflación.
+
+**Equivalente en la moneda histórica (con cambios de moneda):**  
+{format_arg_amount(amount_in_past)} ({currency}) al {date.strftime('%d/%m/%Y')}  
+_{amount_to_words(amount_in_past, currency)}_  
+Este valor muestra cuántos billetes de la moneda antigua necesitarías en esa fecha para tener el mismo poder de compra que el monto actual, considerando tanto la inflación como todos los cambios de moneda y la quita de ceros.  
+Por ejemplo, si hoy tenés 10.000 Pesos y querés saber cuántos Australes equivaldrían en 1991, serían {format_arg_amount(from_current_peso(10000 / get_cumulative_inflation(df, parse_date('01/01/1991'), today_date), parse_date('01/01/1991')))} Australes.
+
+**Período de inflación considerado:**  
+{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+""")
 
 st.info("""
 **¿Qué son los cambios de moneda?**  
-...
+A lo largo de la historia, la Argentina cambió varias veces de moneda y le quitó ceros para simplificar los billetes. Por ejemplo, $10.000.000 de Pesos Moneda Nacional (antes de 1970) equivalen a 1 Peso actual.
+
+**Fuentes y referencias:**
+- [inflacionverdadera.com/argentina](https://www.inflacionverdadera.com/argentina/)
+- Para los meses en los que aún no se conoce el IPC oficial, se utilizan proyecciones del REM (Relevamiento de Expectativas de Mercado) publicado por el BCRA.
+
+**Fuente de datos:** IPC mensual de Argentina (1943-2025).
+
+---
+
+_Creado por MTaurus (X: [@mtaurus_ok](https://x.com/mtaurus_ok))_
 """)
