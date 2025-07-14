@@ -2,15 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- Load data ---
-@st.cache_data
-def load_data():
-    df = pd.read_csv('IPC_MoM_extended_month_forward_added_currency.csv')
-    return df
-
-df = load_data()
-
-# --- Redenominations ---
+# --- Redenominaciones ---
 redenominations = [
     (datetime(1970, 1, 1), 2, 'Peso Ley 18.188'),
     (datetime(1983, 6, 1), 4, 'Peso Argentino'),
@@ -45,7 +37,6 @@ def parse_date(date_str):
     return None
 
 def get_cumulative_inflation(df, start_date, end_date):
-    # Find the rows for the dates
     df['ParsedDate'] = df['Date'].apply(parse_date)
     df = df.dropna(subset=['ParsedDate'])
     df = df.sort_values('ParsedDate')
@@ -55,42 +46,121 @@ def get_cumulative_inflation(df, start_date, end_date):
         return 1.0
     return inflation_factors.iloc[-1]
 
-# --- Streamlit UI ---
-st.title("Argentina Inflation Calculator (with Currency Changes)")
+def format_arg_amount(amount, decimals=2):
+    # Formato argentino: punto de miles, coma decimal
+    return f"{amount:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-direction = st.radio(
-    "Choose conversion direction:",
-    ("Past → Present (adjust for inflation)", "Present → Past (deflate for inflation)")
+# --- Cargar datos ---
+@st.cache_data
+def load_data():
+    df = pd.read_csv('IPC_MoM_extended_month_forward_added_currency.csv')
+    return df
+
+df = load_data()
+df['ParsedDate'] = df['Date'].apply(parse_date)
+min_date = df['ParsedDate'].min()
+max_date = df['ParsedDate'].max()
+
+# --- Interfaz de usuario ---
+st.title("Calculadora de Inflación Argentina (con Cambios de Moneda)")
+
+st.markdown("""
+Esta calculadora permite convertir valores históricos a valores actuales (y viceversa) teniendo en cuenta la inflación y los cambios de moneda ocurridos en la historia argentina.
+
+**Cambios de moneda en Argentina:**
+- **Peso Moneda Nacional** (hasta 1970)
+- **Peso Ley 18.188** (desde 1970, se quitaron 2 ceros)
+- **Peso Argentino** (desde 1983, se quitaron 4 ceros)
+- **Austral** (desde 1985, se quitaron 3 ceros)
+- **Peso** (desde 1992, se quitaron 4 ceros)
+
+Por ejemplo, $10.000.000 de Pesos Moneda Nacional equivalen a 1 Peso actual.
+
+---
+""")
+
+st.warning(
+    "⚠️ El IPC utilizado es mensual y los cálculos son aproximados, especialmente para períodos muy largos o con alta inflación acumulada. "
+    "Los resultados deben interpretarse como una referencia orientativa."
 )
 
-amount = st.number_input("Enter the amount:", min_value=0.0, value=100.0)
-date_str = st.text_input("Enter the date (dd/mm/yyyy or mm/dd/yyyy):", "01/01/1980")
+direction = st.radio(
+    "¿Qué desea calcular?",
+    ("Pasado → Presente (ajustar por inflación)", "Presente → Pasado (deflactar por inflación)")
+)
+
+amount = st.number_input("Ingrese el monto:", min_value=0.0, value=100.0, step=1.0, format="%.2f")
+date_str = st.text_input(
+    f"Ingrese la fecha (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
+    "01/01/1980"
+)
 
 date = parse_date(date_str)
 today = df['Date'].iloc[-1]
 today_date = parse_date(today)
 
 if date is None:
-    st.error("Invalid date format. Please use dd/mm/yyyy or mm/dd/yyyy.")
+    st.error("Formato de fecha inválido. Use dd/mm/aaaa o mm/dd/aaaa.")
+elif date < min_date or date > max_date:
+    st.error(
+        f"La fecha ingresada está fuera del rango de datos disponibles ({min_date.strftime('%d/%m/%Y')} a {max_date.strftime('%d/%m/%Y')})."
+    )
 else:
-    if direction == "Past → Present (adjust for inflation)":
-        # Convert to current Peso
+    if direction == "Pasado → Presente (ajustar por inflación)":
         currency = get_currency(date)
         amount_in_pesos = to_current_peso(amount, date)
-        # Apply inflation
         inflation_factor = get_cumulative_inflation(df, date, today_date)
         adjusted_amount = amount_in_pesos * inflation_factor
-        st.write(f"Original amount: {amount} ({currency}) on {date.strftime('%d/%m/%Y')}")
-        st.write(f"Converted to current Peso: {amount_in_pesos:.8f}")
-        st.write(f"Inflation-adjusted value (current Peso): {adjusted_amount:.2f}")
-        st.write(f"Inflation period: {date.strftime('%d/%m/%Y')} to {today_date.strftime('%d/%m/%Y')}")
+
+        st.markdown(f"""
+**Monto original:**  
+{format_arg_amount(amount)} ({currency}) al {date.strftime('%d/%m/%Y')}  
+_Es el valor nominal en la moneda vigente en esa fecha._
+
+**Equivalente en pesos actuales:**  
+{format_arg_amount(amount_in_pesos, 8)} (Peso)  
+_El monto original convertido a la moneda actual, considerando los cambios de moneda y la quita de ceros._
+
+**Monto ajustado por inflación:**  
+{format_arg_amount(adjusted_amount)} (Peso)  
+_El valor que tendría hoy ese monto, ajustado por la inflación acumulada desde la fecha seleccionada hasta la actualidad._
+
+**Período de inflación considerado:**  
+{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+""")
     else:
-        # Convert from current Peso to past currency
         currency = get_currency(date)
         inflation_factor = get_cumulative_inflation(df, date, today_date)
         amount_in_pesos = amount / inflation_factor
         amount_in_past = from_current_peso(amount_in_pesos, date)
-        st.write(f"Current amount: {amount} (Peso) on {today_date.strftime('%d/%m/%Y')}")
-        st.write(f"Deflated to {amount_in_pesos:.8f} current Peso on {date.strftime('%d/%m/%Y')}")
-        st.write(f"Equivalent in {currency} on {date.strftime('%d/%m/%Y')}: {amount_in_past:.2f}")
-        st.write(f"Inflation period: {date.strftime('%d/%m/%Y')} to {today_date.strftime('%d/%m/%Y')}")
+
+        st.markdown(f"""
+**Monto actual:**  
+{format_arg_amount(amount)} (Peso) al {today_date.strftime('%d/%m/%Y')}  
+_Es el valor nominal en la moneda vigente hoy._
+
+**Equivalente deflactado a la fecha seleccionada:**  
+{format_arg_amount(amount_in_pesos, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
+_El monto actual ajustado hacia atrás por la inflación acumulada._
+
+**Equivalente en la moneda histórica:**  
+{format_arg_amount(amount_in_past)} ({currency}) al {date.strftime('%d/%m/%Y')}  
+_El valor que tendría ese monto en la moneda vigente en la fecha seleccionada, considerando los cambios de moneda y la quita de ceros._
+
+**Período de inflación considerado:**  
+{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+""")
+
+st.info("""
+**Referencias sobre los cambios de moneda en Argentina:**
+- 1970: Peso Moneda Nacional → Peso Ley 18.188 (se quitaron 2 ceros)
+- 1983: Peso Ley 18.188 → Peso Argentino (se quitaron 4 ceros)
+- 1985: Peso Argentino → Austral (se quitaron 3 ceros)
+- 1992: Austral → Peso (se quitaron 4 ceros)
+
+**Fuente de datos:** IPC mensual de Argentina (1943-2025).
+
+---
+
+_Creado por MTaurus (X: [@mtaurus_ok](https://x.com/mtaurus_ok))_
+""")
