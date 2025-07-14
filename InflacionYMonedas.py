@@ -56,6 +56,14 @@ def get_cumulative_inflation(df, start_date, end_date):
     return inflation_factors.iloc[-1] if not inflation_factors.empty else 1.0
 
 def format_arg_amount(amount, decimals=2):
+    # Use scientific notation for very small values (< 1e-6)
+    if abs(amount) < 1e-6 and amount != 0:
+        decimals = 8  # Increase precision for very small values
+        formatted = f"{amount:.{decimals}e}"
+        # Replace 'e' with '×10^' for readability and handle negative exponents
+        formatted = formatted.replace("e", "×10^")
+        return formatted
+    # Use standard Argentine format for other values
     return f"{amount:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def amount_to_words(amount, currency, decimals=2):
@@ -100,7 +108,8 @@ st.warning(
     "⚠️ El IPC utilizado es mensual y los cálculos son aproximados, especialmente para períodos muy largos o con alta inflación acumulada. "
     "Los resultados deben tomarse como una referencia orientativa, no como un valor exacto.\n\n"
     "IMPORTANTE: En el archivo de datos, la columna 'Date' indica el primer día del mes siguiente al período de inflación mensual. "
-    "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945."
+    "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945.\n\n"
+    "NOTA: Para valores muy pequeños (menores a 0.000001), se usa notación científica con 8 decimales para mayor precisión."
 )
 
 # Load data
@@ -212,7 +221,7 @@ _{amount_to_words(amount, 'pesos')}_
 {format_arg_amount(amount_in_past_no_redenom, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount_in_past_no_redenom, 'pesos', 8)}_  
 Este valor muestra cuántos pesos actuales equivaldrían, en poder de compra, a la fecha elegida, **sin** tener en cuenta los cambios de moneda.  
-Por ejemplo, if hoy tenés 10.000 Pesos y querés saber cuánto valdrían en 1980, serían {format_arg_amount(10000 / get_cumulative_inflation(df, parse_date('01/01/1980'), today_date), 8)} Pesos actuales de ese año, solo ajustando por inflación.
+Por ejemplo, si hoy tenés 10.000 Pesos y querés saber cuánto valdrían en 1980, serían {format_arg_amount(10000 / get_cumulative_inflation(df, parse_date('01/01/1980'), today_date), 8)} Pesos actuales de ese año, solo ajustando por inflación.
 
 **Equivalente en la moneda histórica (con cambios de moneda):**  
 {format_arg_amount(amount_in_past)} ({currency}) al {date.strftime('%d/%m/%Y')}  
