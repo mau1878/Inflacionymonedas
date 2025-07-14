@@ -104,7 +104,8 @@ st.warning(
     "Los resultados deben tomarse como una referencia orientativa, no como un valor exacto.\n\n"
     "IMPORTANTE: En el archivo de datos, la columna 'Date' indica el primer día del mes siguiente al período de inflación mensual. "
     "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945.\n\n"
-    "NOTA: Para valores muy pequeños (menores a 0.000001), se muestran tanto el formato decimal con 12 decimales como la notación científica con 8 decimales para mayor precisión."
+    "NOTA: Para valores muy pequeños (menores a 0.000001), se muestran tanto el formato decimal con 12 decimales como la notación científica con 8 decimales para mayor precisión.\n\n"
+    "NOTA: El monto ingresado se muestra formateado con separadores de miles debajo del campo de entrada para facilitar la lectura."
 )
 
 # Load data
@@ -135,6 +136,12 @@ with st.form("calculation_form"):
             min_value=0.0, value=100.0, step=1.0, format="%.2f",
             key="amount_past"
         )
+        # Display formatted amount in real-time
+        amount_normal, amount_scientific = format_arg_amount(amount)
+        amount_display = f"Monto formateado: {amount_normal}"
+        if amount_scientific:
+            amount_display += f" ({amount_scientific})"
+        st.write(amount_display)
         selected_date = st.date_input(
             f"¿De qué fecha es ese monto? (seleccioná una fecha entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}):",
             value=date(1980, 1, 1),
@@ -149,6 +156,12 @@ with st.form("calculation_form"):
             min_value=0.0, value=100.0, step=1.0, format="%.2f",
             key="amount_present"
         )
+        # Display formatted amount in real-time
+        amount_normal, amount_scientific = format_arg_amount(amount)
+        amount_display = f"Monto formateado: {amount_normal}"
+        if amount_scientific:
+            amount_display += f" ({amount_scientific})"
+        st.write(amount_display)
         selected_date = st.date_input(
             f"¿A qué fecha querés llevar ese monto? (seleccioná una fecha entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}):",
             value=date(1980, 1, 1),
