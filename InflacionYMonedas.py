@@ -21,11 +21,17 @@ def get_currency_and_factor(date):
     return current, factor
 
 def convert_to_current_peso(amount, date):
-    factor = 1
-    for i in range(1, len(currency_steps)):
-        if date >= currency_steps[i][1]:
-            factor *= 10 ** currency_steps[i][2]
-    return amount / factor
+    # List of redenominations: (date, zeroes removed)
+    redenominations = [
+        (datetime(1970, 1, 1), 2),   # Peso Moneda Nacional → Peso Ley 18.188
+        (datetime(1983, 6, 1), 4),   # Peso Ley 18.188 → Peso Argentino
+        (datetime(1985, 6, 15), 3),  # Peso Argentino → Austral
+        (datetime(1992, 1, 1), 4),   # Austral → Peso
+    ]
+    for change_date, zeroes in redenominations:
+        if date < change_date:
+            amount /= 10 ** zeroes
+    return amount
 
 # --- Load data ---
 @st.cache_data
