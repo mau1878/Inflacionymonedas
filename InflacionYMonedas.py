@@ -115,8 +115,8 @@ st.warning(
 direction = st.radio(
     "¿Qué querés calcular?",
     (
-        "Pasado → Presente (ajustar por inflación)",
-        "Presente → Pasado (deflactar por inflación)"
+        "Llevar un monto del pasado al presente. Pasado → Presente (ajustar por inflación)",
+        "Llevar un monto del presente al pasado. Presente → Pasado (deflactar por inflación)"
     )
 )
 
