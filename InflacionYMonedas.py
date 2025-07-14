@@ -46,7 +46,12 @@ def add_months(dt, months):
         29 if year%4==0 and not year%100==0 or year%400==0 else 28,
         31,30,31,30,31,31,30,31,30,31][month-1])
     return datetime(year, month, day)
-
+    
+def scientific_notation(amount, threshold=0.01, decimals=2):
+    if abs(amount) < threshold and amount != 0:
+        return f" ({amount:.2e} en notación científica)"
+    return ""
+    
 def get_cumulative_inflation(df, start_date, end_date):
     # El primer valor de inflación a aplicar es el del mes siguiente a la fecha ingresada
     df['ParsedDate'] = df['Date'].apply(parse_date)
@@ -165,8 +170,8 @@ else:
 _{amount_to_words(amount, currency)}_
 
 **Equivalente en pesos actuales (solo por cambios de moneda):**  
-{format_arg_amount(amount_in_pesos, 8)} (Peso)  
-_{amount_to_words(amount_in_pesos, 'pesos', 8)}_  
+{format_arg_amount(amount_in_pesos, 20)} (Peso)  
+_{amount_to_words(amount_in_pesos, 'pesos', 20)}_  
 Este valor muestra cuántos pesos actuales obtendrías si solo se aplicaran los cambios de moneda y la quita de ceros, **sin** tener en cuenta la inflación.  
 Por ejemplo, si en 1991 tenías 100.000 Australes, hoy serían 10 Pesos actuales, porque en 1992 se quitaron 4 ceros y se cambió de Austral a Peso.
 
