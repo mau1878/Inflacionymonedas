@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from num2words import num2words
 
 # --- Redenominaciones ---
@@ -29,14 +29,6 @@ def from_current_peso(amount, date):
             amount *= 10 ** zeroes
     return amount
 
-def parse_date(date_str):
-    for fmt in ('%d/%m/%Y', '%m/%d/%Y'):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
-    return None
-
 def add_months(dt, months):
     month = dt.month - 1 + months
     year = dt.year + month // 12
@@ -47,7 +39,7 @@ def add_months(dt, months):
     return datetime(year, month, day)
 
 def get_cumulative_inflation(df, start_date, end_date):
-    df['ParsedDate'] = df['Date'].apply(parse_date)
+    df['ParsedDate'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
     df = df.dropna(subset=['ParsedDate'])
     df = df.sort_values('ParsedDate')
     first_inflation_date = add_months(start_date, 1).replace(day=1)
@@ -117,9 +109,9 @@ st.warning(
 
 # Load data
 df = load_data()
-df['ParsedDate'] = df['Date'].apply(parse_date)
-min_date = df['ParsedDate'].min()
-max_date = df['ParsedDate'].max()
+df['ParsedDate'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+min_date = df['ParsedDate'].min().date()
+max_date = df['ParsedDate'].max().date()
 
 # Radio button for mode selection
 st.session_state.direction = st.radio(
@@ -143,9 +135,11 @@ with st.form("calculation_form"):
             min_value=0.0, value=100.0, step=1.0, format="%.2f",
             key="amount_past"
         )
-        date_str = st.text_input(
-            f"¿De qué fecha es ese monto? (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
-            "01/01/1980",
+        selected_date = st.date_input(
+            f"¿De qué fecha es ese monto? (seleccioná una fecha entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}):",
+            value=date(1980, 1, 1),
+            min_value=min_date,
+            max_value=max_date,
             key="date_past"
         )
     else:
@@ -155,30 +149,30 @@ with st.form("calculation_form"):
             min_value=0.0, value=100.0, step=1.0, format="%.2f",
             key="amount_present"
         )
-        date_str = st.text_input(
-            f"¿A qué fecha querés llevar ese monto? (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
-            "01/01/1980",
+        selected_date = st.date_input(
+            f"¿A qué fecha querés llevar ese monto? (seleccioná una fecha entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}):",
+            value=date(1980, 1, 1),
+            min_value=min_date,
+            max_value=max_date,
             key="date_present"
         )
     
     submitted = st.form_submit_button("Calcular")
 
 if submitted:
-    date = parse_date(date_str)
-    today = df['Date'].iloc[-1]
-    today_date = parse_date(today)
+    # Convert selected_date (datetime.date) to datetime.datetime
+    date = datetime.combine(selected_date, datetime.min.time())
+    today = df['ParsedDate'].iloc[-1].to_pydatetime()
 
-    if date is None:
-        st.error("Formato de fecha inválido. Usá dd/mm/aaaa o mm/dd/aaaa.")
-    elif date < min_date or date > max_date:
+    if date < datetime.combine(min_date, datetime.min.time()) or date > datetime.combine(max_date, datetime.min.time()):
         st.error(
-            f"La fecha ingresada está fuera del rango de datos disponibles ({min_date.strftime('%d/%m/%Y')} a {max_date.strftime('%d/%m/%Y')})."
+            f"La fecha seleccionada está fuera del rango de datos disponibles ({min_date.strftime('%d/%m/%Y')} a {max_date.strftime('%d/%m/%Y')})."
         )
     else:
         if st.session_state.direction == "Pasado → Presente (ajustar por inflación)":
             currency = get_currency(date)
             amount_in_pesos = to_current_peso(amount, date)
-            inflation_factor = get_cumulative_inflation(df, date, today_date)
+            inflation_factor = get_cumulative_inflation(df, date, today)
             adjusted_amount = amount_in_pesos * inflation_factor
             adjusted_amount_no_redenom = amount * inflation_factor
 
@@ -187,7 +181,9 @@ if submitted:
             amount_in_pesos_normal, amount_in_pesos_scientific = format_arg_amount(amount_in_pesos, 8)
             adjusted_amount_no_redenom_normal, adjusted_amount_no_redenom_scientific = format_arg_amount(adjusted_amount_no_redenom)
             adjusted_amount_normal, adjusted_amount_scientific = format_arg_amount(adjusted_amount)
-            example_amount_normal, example_amount_scientific = format_arg_amount(to_current_peso(100, parse_date('01/01/1980')) * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))
+            example_amount_normal, example_amount_scientific = format_arg_amount(
+                to_current_peso(100, datetime(1980, 1, 1)) * get_cumulative_inflation(df, datetime(1980, 1, 1), today)
+            )
 
             # Build output string
             amount_display = f"{amount_normal} ({currency})"
@@ -221,7 +217,7 @@ Por ejemplo, si en 1991 tenías 100.000 Australes, hoy serían 10 Pesos actuales
 {adjusted_amount_no_redenom_display}  
 _{amount_to_words(adjusted_amount_no_redenom, currency)}_  
 Este valor muestra cuánto dinero necesitarías hoy, en la **misma moneda antigua**, para tener el mismo poder de compra que tenías en esa fecha.  
-Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(100 * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))[0]} Pesos Ley para comprar lo mismo.
+Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(100 * get_cumulative_inflation(df, datetime(1980, 1, 1), today))[0]} Pesos Ley para comprar lo mismo.
 
 **Monto ajustado por inflación y cambios de moneda:**  
 {adjusted_amount_display}  
@@ -230,11 +226,11 @@ Este es el valor más realista: muestra cuántos pesos actuales necesitarías ho
 Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {example_amount_display} Pesos actuales para comprar lo mismo.
 
 **Período de inflación considerado:**  
-{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+{date.strftime('%d/%m/%Y')} a {today.strftime('%d/%m/%Y')}
 """)
         else:
             currency = get_currency(date)
-            inflation_factor = get_cumulative_inflation(df, date, today_date)
+            inflation_factor = get_cumulative_inflation(df, date, today)
             amount_in_pesos = amount / inflation_factor
             amount_in_past = from_current_peso(amount_in_pesos, date)
             amount_in_past_no_redenom = amount_in_pesos
@@ -243,8 +239,12 @@ Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {example_amount
             amount_normal, amount_scientific = format_arg_amount(amount)
             amount_in_past_no_redenom_normal, amount_in_past_no_redenom_scientific = format_arg_amount(amount_in_past_no_redenom, 8)
             amount_in_past_normal, amount_in_past_scientific = format_arg_amount(amount_in_past)
-            example_amount_1980_normal, example_amount_1980_scientific = format_arg_amount(10000 / get_cumulative_inflation(df, parse_date('01/01/1980'), today_date), 8)
-            example_amount_1991_normal, example_amount_1991_scientific = format_arg_amount(from_current_peso(10000 / get_cumulative_inflation(df, parse_date('01/01/1991'), today_date), parse_date('01/01/1991')))
+            example_amount_1980_normal, example_amount_1980_scientific = format_arg_amount(
+                10000 / get_cumulative_inflation(df, datetime(1980, 1, 1), today), 8
+            )
+            example_amount_1991_normal, example_amount_1991_scientific = format_arg_amount(
+                from_current_peso(10000 / get_cumulative_inflation(df, datetime(1991, 1, 1), today), datetime(1991, 1, 1))
+            )
 
             # Build output string
             amount_display = f"{amount_normal} (Peso)"
@@ -265,7 +265,7 @@ Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {example_amount
 
             st.markdown(f"""
 **Monto actual:**  
-{amount_display} al {today_date.strftime('%d/%m/%Y')}  
+{amount_display} al {today.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount, 'pesos')}_
 
 **Equivalente deflactado a la fecha seleccionada (solo por inflación):**  
@@ -281,7 +281,7 @@ Este valor muestra cuántos billetes de la moneda antigua necesitarías en esa f
 Por ejemplo, si hoy tenés 10.000 Pesos y querés saber cuántos Australes equivaldrían en 1991, serían {example_amount_1991_display} Australes.
 
 **Período de inflación considerado:**  
-{date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
+{date.strftime('%d/%m/%Y')} a {today.strftime('%d/%m/%Y')}
 """)
 
 st.info("""
