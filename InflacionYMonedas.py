@@ -53,16 +53,15 @@ def scientific_notation(amount, threshold=0.01, decimals=2):
     return ""
     
 def get_cumulative_inflation(df, start_date, end_date):
-    # El primer valor de inflación a aplicar es el del mes siguiente a la fecha ingresada
     df['ParsedDate'] = df['Date'].apply(parse_date)
     df = df.dropna(subset=['ParsedDate'])
     df = df.sort_values('ParsedDate')
     # Primer día del mes siguiente a la fecha ingresada
     first_inflation_date = add_months(start_date, 1).replace(day=1)
     mask = (df['ParsedDate'] >= first_inflation_date) & (df['ParsedDate'] <= end_date)
-    inflation_factors = (1 + df.loc[mask, 'CPI_MoM'].astype(float)).cumprod()
-    if inflation_factors.empty:
+    if not mask.any():
         return 1.0
+    inflation_factors = (1 + df.loc[mask, 'CPI_MoM'].astype(float)).cumprod()
     return inflation_factors.iloc[-1]
 
 def format_arg_amount(amount, decimals=2):
