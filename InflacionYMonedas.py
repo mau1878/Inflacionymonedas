@@ -62,11 +62,36 @@ def format_arg_amount(amount, decimals=2):
     return formatted_normal, None
 
 def amount_to_words(amount, currency, decimals=2):
+    # Handle very small numbers
+    if abs(amount) < 1e-6 and amount != 0:
+        formatted_normal, _ = format_arg_amount(amount, 12)
+        return f"Valor muy pequeño: {formatted_normal} {currency}"
+    # Handle conversion to words
     entero = int(round(amount))
     decimales = int(round((amount - entero) * (10 ** decimals)))
+    try:
+        # Try Spanish first
+        word_part = num2words(entero, lang='es').capitalize()
+    except OverflowError:
+        try:
+            # Fallback to English
+            word_part = num2words(entero, lang='en').capitalize() + " (en inglés)"
+        except OverflowError:
+            # If both fail, return formatted number
+            formatted_normal, _ = format_arg_amount(amount, decimals)
+            return f"Valor demasiado grande para expresar en palabras: {formatted_normal} {currency}"
     if decimales > 0:
-        return f"{num2words(entero, lang='es').capitalize()} {currency} con {num2words(decimales, lang='es')} centavos"
-    return f"{num2words(entero, lang='es').capitalize()} {currency}"
+        try:
+            decimal_words = num2words(decimales, lang='es').capitalize()
+            return f"{word_part} {currency} con {decimal_words} centavos"
+        except OverflowError:
+            try:
+                decimal_words = num2words(decimales, lang='en').capitalize() + " (en inglés)"
+                return f"{word_part} {currency} con {decimal_words} centavos"
+            except OverflowError:
+                formatted_normal, _ = format_arg_amount(amount, decimals)
+                return f"Valor demasiado grande para expresar en palabras: {formatted_normal} {currency}"
+    return f"{word_part} {currency}"
 
 # --- Cargar datos ---
 @st.cache_data
@@ -105,7 +130,8 @@ st.warning(
     "IMPORTANTE: En el archivo de datos, la columna 'Date' indica el primer día del mes siguiente al período de inflación mensual. "
     "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945.\n\n"
     "NOTA: Para valores muy pequeños (menores a 0.000001), se muestran tanto el formato decimal con 12 decimales como la notación científica con 8 decimales para mayor precisión.\n\n"
-    "NOTA: El monto ingresado se muestra formateado con separadores de miles debajo del campo de entrada para facilitar la lectura."
+    "NOTA: El monto ingresado se muestra formateado con separadores de miles debajo del campo de entrada para facilitar la lectura.\n\n"
+    "NOTA: Para valores extremadamente grandes, se intenta expresar el número en palabras en español, luego en inglés, y si ambos fallan, se muestra el número formateado."
 )
 
 # Load data
@@ -128,7 +154,8 @@ st.session_state.direction = st.radio(
 st.write(f"Modo actual: {st.session_state.direction}")
 
 # Input form to handle amount and date
-with st.form("calculation_form"):
+with st.form("calculation_f
+orm"):
     if st.session_state.direction == "Pasado → Presente (ajustar por inflación)":
         st.subheader("¿Cuánto valdría hoy un monto del pasado?")
         amount = st.number_input(
