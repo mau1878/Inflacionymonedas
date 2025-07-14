@@ -110,16 +110,36 @@ st.warning(
     "Por ejemplo, el valor junto a 01/02/1945 corresponde a la inflación de enero de 1945."
 )
 
+# ... (resto del script igual)
+
 direction = st.radio(
     "¿Qué querés calcular?",
-    ("Pasado → Presente (ajustar por inflación)", "Presente → Pasado (deflactar por inflación)")
+    (
+        "Pasado → Presente (ajustar por inflación)",
+        "Presente → Pasado (deflactar por inflación)"
+    )
 )
 
-amount = st.number_input("Ingresá el monto:", min_value=0.0, value=100.0, step=1.0, format="%.2f")
-date_str = st.text_input(
-    f"Ingresá la fecha (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
-    "01/01/1980"
-)
+if direction == "Pasado → Presente (ajustar por inflación)":
+    st.subheader("¿Cuánto valdría hoy un monto del pasado?")
+    amount = st.number_input(
+        "Ingresá el monto que tenías en el pasado:",
+        min_value=0.0, value=100.0, step=1.0, format="%.2f"
+    )
+    date_str = st.text_input(
+        f"¿De qué fecha es ese monto? (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
+        "01/01/1980"
+    )
+else:
+    st.subheader("¿Cuánto valdría en el pasado un monto actual?")
+    amount = st.number_input(
+        "Ingresá el monto que tenés hoy:",
+        min_value=0.0, value=100.0, step=1.0, format="%.2f"
+    )
+    date_str = st.text_input(
+        f"¿A qué fecha querés llevar ese monto? (dd/mm/aaaa o mm/dd/aaaa) entre {min_date.strftime('%d/%m/%Y')} y {max_date.strftime('%d/%m/%Y')}:",
+        "01/01/1980"
+    )
 
 date = parse_date(date_str)
 today = df['Date'].iloc[-1]
