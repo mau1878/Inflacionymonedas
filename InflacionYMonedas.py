@@ -168,6 +168,10 @@ st.info("""
 **¿Qué son los cambios de moneda?**  
 A lo largo de la historia, la Argentina cambió varias veces de moneda y le quitó ceros para simplificar los billetes. Por ejemplo, $10.000.000 de Pesos Moneda Nacional (antes de 1970) equivalen a 1 Peso actual.
 
+**Fuentes y referencias:**
+- [inflacionverdadera.com/argentina](https://www.inflacionverdadera.com/argentina/)
+- Para los meses en los que aún no se conoce el IPC oficial, se utilizan proyecciones del REM (Relevamiento de Expectativas de Mercado) publicado por el BCRA.
+
 **Fuente de datos:** IPC mensual de Argentina (1943-2025).
 
 ---
