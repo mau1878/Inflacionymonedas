@@ -47,7 +47,6 @@ def get_cumulative_inflation(df, start_date, end_date):
     return inflation_factors.iloc[-1]
 
 def format_arg_amount(amount, decimals=2):
-    # Formato argentino: punto de miles, coma decimal
     return f"{amount:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # --- Cargar datos ---
@@ -111,19 +110,24 @@ else:
         amount_in_pesos = to_current_peso(amount, date)
         inflation_factor = get_cumulative_inflation(df, date, today_date)
         adjusted_amount = amount_in_pesos * inflation_factor
+        adjusted_amount_no_redenom = amount * inflation_factor  # Solo inflación, sin quita de ceros
 
         st.markdown(f"""
 **Monto original:**  
 {format_arg_amount(amount)} ({currency}) al {date.strftime('%d/%m/%Y')}  
 _Es el valor nominal en la moneda vigente en esa fecha._
 
-**Equivalente en pesos actuales:**  
+**Equivalente en pesos actuales (solo por cambios de moneda):**  
 {format_arg_amount(amount_in_pesos, 8)} (Peso)  
-_El monto original convertido a la moneda actual, considerando los cambios de moneda y la quita de ceros._
+_Este valor **no** está ajustado por inflación, solo refleja la conversión por quita de ceros y cambios de moneda._
 
-**Monto ajustado por inflación:**  
+**Monto ajustado solo por inflación (sin cambios de moneda):**  
+{format_arg_amount(adjusted_amount_no_redenom)} ({currency})  
+_Es el valor que tendría hoy ese monto si nunca se hubieran quitado ceros ni cambiado de moneda, solo ajustando por inflación._
+
+**Monto ajustado por inflación y cambios de moneda:**  
 {format_arg_amount(adjusted_amount)} (Peso)  
-_El valor que tendría hoy ese monto, ajustado por la inflación acumulada desde la fecha seleccionada hasta la actualidad._
+_Es el valor que tendría hoy ese monto, ajustado por la inflación acumulada **y** considerando los cambios de moneda y la quita de ceros._
 
 **Período de inflación considerado:**  
 {date.strftime('%d/%m/%Y')} a {today_date.strftime('%d/%m/%Y')}
@@ -133,17 +137,18 @@ _El valor que tendría hoy ese monto, ajustado por la inflación acumulada desde
         inflation_factor = get_cumulative_inflation(df, date, today_date)
         amount_in_pesos = amount / inflation_factor
         amount_in_past = from_current_peso(amount_in_pesos, date)
+        amount_in_past_no_redenom = amount_in_pesos  # Solo inflación, sin quita de ceros
 
         st.markdown(f"""
 **Monto actual:**  
 {format_arg_amount(amount)} (Peso) al {today_date.strftime('%d/%m/%Y')}  
 _Es el valor nominal en la moneda vigente hoy._
 
-**Equivalente deflactado a la fecha seleccionada:**  
-{format_arg_amount(amount_in_pesos, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
-_El monto actual ajustado hacia atrás por la inflación acumulada._
+**Equivalente deflactado a la fecha seleccionada (solo por inflación):**  
+{format_arg_amount(amount_in_past_no_redenom, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
+_El monto actual ajustado hacia atrás por la inflación acumulada, sin considerar cambios de moneda._
 
-**Equivalente en la moneda histórica:**  
+**Equivalente en la moneda histórica (con cambios de moneda):**  
 {format_arg_amount(amount_in_past)} ({currency}) al {date.strftime('%d/%m/%Y')}  
 _El valor que tendría ese monto en la moneda vigente en la fecha seleccionada, considerando los cambios de moneda y la quita de ceros._
 
