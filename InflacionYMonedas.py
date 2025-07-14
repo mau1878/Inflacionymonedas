@@ -46,22 +46,18 @@ def add_months(dt, months):
         29 if year%4==0 and not year%100==0 or year%400==0 else 28,
         31,30,31,30,31,31,30,31,30,31][month-1])
     return datetime(year, month, day)
-    
-def scientific_notation(amount, threshold=0.01, decimals=2):
-    if abs(amount) < threshold and amount != 0:
-        return f" ({amount:.2e} en notación científica)"
-    return ""
-    
+
 def get_cumulative_inflation(df, start_date, end_date):
+    # El primer valor de inflación a aplicar es el del mes siguiente a la fecha ingresada
     df['ParsedDate'] = df['Date'].apply(parse_date)
     df = df.dropna(subset=['ParsedDate'])
     df = df.sort_values('ParsedDate')
     # Primer día del mes siguiente a la fecha ingresada
     first_inflation_date = add_months(start_date, 1).replace(day=1)
     mask = (df['ParsedDate'] >= first_inflation_date) & (df['ParsedDate'] <= end_date)
-    if not mask.any():
-        return 1.0
     inflation_factors = (1 + df.loc[mask, 'CPI_MoM'].astype(float)).cumprod()
+    if inflation_factors.empty:
+        return 1.0
     return inflation_factors.iloc[-1]
 
 def format_arg_amount(amount, decimals=2):
@@ -165,23 +161,23 @@ else:
 
         st.markdown(f"""
 **Monto original:**  
-{format_arg_amount(amount)} ({currency}){scientific_notation(amount)} al {date.strftime('%d/%m/%Y')}  
+{format_arg_amount(amount)} ({currency}) al {date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount, currency)}_
 
 **Equivalente en pesos actuales (solo por cambios de moneda):**  
-{format_arg_amount(amount_in_pesos, 8)} (Peso){scientific_notation(amount_in_pesos, threshold=0.01, decimals=8)}  
+{format_arg_amount(amount_in_pesos, 8)} (Peso)  
 _{amount_to_words(amount_in_pesos, 'pesos', 8)}_  
 Este valor muestra cuántos pesos actuales obtendrías si solo se aplicaran los cambios de moneda y la quita de ceros, **sin** tener en cuenta la inflación.  
 Por ejemplo, si en 1991 tenías 100.000 Australes, hoy serían 10 Pesos actuales, porque en 1992 se quitaron 4 ceros y se cambió de Austral a Peso.
 
 **Monto ajustado solo por inflación (sin cambios de moneda):**  
-{format_arg_amount(adjusted_amount_no_redenom)} ({currency}){scientific_notation(adjusted_amount_no_redenom)}  
+{format_arg_amount(adjusted_amount_no_redenom)} ({currency})  
 _{amount_to_words(adjusted_amount_no_redenom, currency)}_  
 Este valor muestra cuánto dinero necesitarías hoy, en la **misma moneda antigua**, para tener el mismo poder de compra que tenías en esa fecha.  
 Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(100 * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))} Pesos Ley para comprar lo mismo.
 
 **Monto ajustado por inflación y cambios de moneda:**  
-{format_arg_amount(adjusted_amount)} (Peso){scientific_notation(adjusted_amount)}  
+{format_arg_amount(adjusted_amount)} (Peso)  
 _{amount_to_words(adjusted_amount, 'pesos')}_  
 Este es el valor más realista: muestra cuántos pesos actuales necesitarías hoy para tener el mismo poder de compra que ese monto en la fecha elegida, considerando tanto la inflación como todos los cambios de moneda.  
 Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amount(to_current_peso(100, parse_date('01/01/1980')) * get_cumulative_inflation(df, parse_date('01/01/1980'), today_date))} Pesos actuales para comprar lo mismo.
@@ -198,17 +194,17 @@ Por ejemplo, si en 1980 tenías 100 Pesos Ley, hoy necesitarías {format_arg_amo
 
         st.markdown(f"""
 **Monto actual:**  
-{format_arg_amount(amount)} (Peso){scientific_notation(amount)} al {today_date.strftime('%d/%m/%Y')}  
+{format_arg_amount(amount)} (Peso) al {today_date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount, 'pesos')}_
 
 **Equivalente deflactado a la fecha seleccionada (solo por inflación):**  
-{format_arg_amount(amount_in_past_no_redenom, 8)} (Peso){scientific_notation(amount_in_past_no_redenom, threshold=0.01, decimals=8)} al {date.strftime('%d/%m/%Y')}  
+{format_arg_amount(amount_in_past_no_redenom, 8)} (Peso) al {date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount_in_past_no_redenom, 'pesos', 8)}_  
 Este valor muestra cuántos pesos actuales equivaldrían, en poder de compra, a la fecha elegida, **sin** tener en cuenta los cambios de moneda.  
 Por ejemplo, si hoy tenés 10.000 Pesos y querés saber cuánto valdrían en 1980, serían {format_arg_amount(10000 / get_cumulative_inflation(df, parse_date('01/01/1980'), today_date), 8)} Pesos actuales de ese año, solo ajustando por inflación.
 
 **Equivalente en la moneda histórica (con cambios de moneda):**  
-{format_arg_amount(amount_in_past)} ({currency}){scientific_notation(amount_in_past)} al {date.strftime('%d/%m/%Y')}  
+{format_arg_amount(amount_in_past)} ({currency}) al {date.strftime('%d/%m/%Y')}  
 _{amount_to_words(amount_in_past, currency)}_  
 Este valor muestra cuántos billetes de la moneda antigua necesitarías en esa fecha para tener el mismo poder de compra que el monto actual, considerando tanto la inflación como todos los cambios de moneda y la quita de ceros.  
 Por ejemplo, si hoy tenés 10.000 Pesos y querés saber cuántos Australes equivaldrían en 1991, serían {format_arg_amount(from_current_peso(10000 / get_cumulative_inflation(df, parse_date('01/01/1991'), today_date), parse_date('01/01/1991')))} Australes.
