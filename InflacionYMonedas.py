@@ -154,8 +154,7 @@ st.session_state.direction = st.radio(
 st.write(f"Modo actual: {st.session_state.direction}")
 
 # Input form to handle amount and date
-with st.form("calculation_f
-orm"):
+with st.form("calculation_form"):
     if st.session_state.direction == "Pasado → Presente (ajustar por inflación)":
         st.subheader("¿Cuánto valdría hoy un monto del pasado?")
         amount = st.number_input(
